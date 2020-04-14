@@ -14,7 +14,7 @@ git config --global credential.helper auto-switch
 
 ### Mac + Xcode環境の場合
 
-Xcode付属の `gitconfig` がある場合、 `credential.helper` が `credential.helper` に上書きされてしまいます。
+Xcode付属の `gitconfig` がある場合、 `credential.helper` が `osxkeychain` に上書きされてしまいます。
 
 以下のコマンドで削除することにより、正常に動作します。
 
