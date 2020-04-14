@@ -15,6 +15,40 @@ const config = fs.existsSync(configPath)
 
 const [, , mode] = process.argv;
 
+const getRepoURL = async (
+  protocol: string,
+  host: string
+): Promise<string | undefined> => {
+  const gitConfig = await new Promise<GitConfig>((resolve, reject) => {
+    GitConfigLocal(process.cwd(), (error, data) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(data);
+      }
+    });
+  });
+
+  const remotes: {
+    [name: string]: {
+      url: string;
+      fetch: string;
+    };
+  } = gitConfig.remote;
+
+  const repoRemote = Object.entries(remotes).find(([name, { url }]) => {
+    const remoteURLElements = new URL(url);
+    return (
+      remoteURLElements.protocol === `${protocol}:` &&
+      remoteURLElements.host === host
+    );
+  });
+
+  const repoURL = repoRemote && repoRemote[1].url;
+
+  return repoURL;
+};
+
 if (mode === "get") {
   const stdin = readline.createInterface(process.stdin);
 
@@ -35,32 +69,7 @@ if (mode === "get") {
       const protocol = lines[0].split("=")[1];
       const host = lines[1].split("=")[1];
 
-      const gitConfig = await new Promise<GitConfig>((resolve, reject) => {
-        GitConfigLocal(process.cwd(), (error, data) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve(data);
-          }
-        });
-      });
-
-      const remotes: {
-        [name: string]: {
-          url: string;
-          fetch: string;
-        };
-      } = gitConfig.remote;
-
-      const repoRemote = Object.entries(remotes).find(([name, { url }]) => {
-        const remoteURLElements = new URL(url);
-        return (
-          remoteURLElements.protocol === `${protocol}:` &&
-          remoteURLElements.host === host
-        );
-      });
-
-      const repoURL = repoRemote && repoRemote[1].url;
+      const repoURL = await getRepoURL(protocol, host);
 
       if (!repoURL) {
         process.exit(1);
@@ -70,15 +79,18 @@ if (mode === "get") {
 
       const pathElements = pathname.split("/").filter((el) => el);
 
-      const [username] = pathElements;
+      const [usernameOrOrgName] = pathElements;
 
-      const password = config[protocol]?.[host]?.[username];
+      const { username, password } =
+        config[protocol]?.[host]?.[usernameOrOrgName] || {};
+
+      if (!password) {
+        process.exit(1);
+      }
 
       if (password) {
         process.stdout.write(`username=${username}\n`);
         process.stdout.write(`password=${password}\n`);
-      } else {
-        process.exit(1);
       }
     } catch (error) {
       console.error(error);
@@ -97,17 +109,35 @@ if (mode === "get") {
     }
   });
 
-  stdin.on("close", () => {
-    const [protocol, host, username, password] = lines.map(
-      (line) => line.split("=")[1]
-    );
+  stdin.on("close", async () => {
+    try {
+      const [protocol, host, username, password] = lines.map(
+        (line) => line.split("=")[1]
+      );
 
-    if (!config[protocol]) config[protocol] = {};
-    if (!config[protocol][host]) config[protocol][host] = {};
+      const repoURL = await getRepoURL(protocol, host);
 
-    config[protocol][host][username] = password;
+      if (!repoURL) {
+        process.exit(1);
+      }
+      const { pathname } = new URL(repoURL);
 
-    fs.writeFileSync(configPath, YAML.stringify(config));
+      const pathElements = pathname.split("/").filter((el) => el);
+
+      const [usernameOrOrgName] = pathElements;
+
+      if (!config[protocol]) config[protocol] = {};
+      if (!config[protocol][host]) config[protocol][host] = {};
+      if (!config[protocol][host][usernameOrOrgName])
+        config[protocol][host][usernameOrOrgName] = {};
+
+      config[protocol][host][usernameOrOrgName] = { password, username };
+
+      fs.writeFileSync(configPath, YAML.stringify(config));
+    } catch (error) {
+      console.error(error);
+      process.exit(1);
+    }
   });
 } else if (mode === "erase") {
   // ToDo: eraseを実装する
