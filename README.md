@@ -12,6 +12,16 @@ Releases からバイナリーを落とし、 `PATH` の通っている所に `g
 git config --global credential.helper auto-switch
 ```
 
+### Mac + Xcode環境の場合
+
+Xcode付属の `gitconfig` がある場合、 `credential.helper` が `credential.helper` に上書きされてしまいます。
+
+以下のコマンドで削除することにより、正常に動作します。
+
+```
+sudo rm /Applications/Xcode.app/Contents/Developer/usr/share/git-core/gitconfig
+```
+
 ## 使い方
 
 `origin` が**https**のリポジトリ内で、通常通りにユーザーネームとパスワードを入力するだけで、パスワードの保存・切り替えが行われます。
