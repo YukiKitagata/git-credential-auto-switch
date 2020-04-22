@@ -66,8 +66,16 @@ if (mode === "get") {
 
   stdin.on("close", async () => {
     try {
-      const protocol = lines[0].split("=")[1];
-      const host = lines[1].split("=")[1];
+      const data: {
+        [key: string]: string;
+      } = {};
+
+      lines.forEach((line) => {
+        const [key, value] = line.split("=");
+        data[key] = value;
+      });
+
+      const { protocol, host } = data;
 
       const repoURL = await getRepoURL(protocol, host);
 
@@ -111,9 +119,16 @@ if (mode === "get") {
 
   stdin.on("close", async () => {
     try {
-      const [protocol, host, username, password] = lines.map(
-        (line) => line.split("=")[1]
-      );
+      const data: {
+        [key: string]: string;
+      } = {};
+
+      lines.forEach((line) => {
+        const [key, value] = line.split("=");
+        data[key] = value;
+      });
+
+      const { protocol, host, username, password } = data;
 
       const repoURL = await getRepoURL(protocol, host);
 
@@ -131,7 +146,8 @@ if (mode === "get") {
       if (!config[protocol][host][usernameOrOrgName])
         config[protocol][host][usernameOrOrgName] = {};
 
-      config[protocol][host][usernameOrOrgName] = { password, username };
+      if (password)
+        config[protocol][host][usernameOrOrgName] = { password, username };
 
       fs.writeFileSync(configPath, YAML.stringify(config));
     } catch (error) {
